@@ -1,0 +1,28 @@
+# Build artifacts (Cargo / Rust)
+/target/
+
+# Generated gRPC/protobuf code
+**/proto/gen/
+**/*.pb.rs
+**/*.pb.go
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local config / secrets
+*.local
+secrets.toml
+.env
+*.pem
+*.key
+
+# Logs
+*.log
+/logs/
+
+# CI / coverage output
+/coverage/

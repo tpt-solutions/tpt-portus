@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Error taxonomy (DESIGN.md §10.1).
+//!
+//! Variants beyond the spec's taxonomy:
+//! - `IntentNotFound`: a query for an unknown intent.
+//! - `DisputeWindowDrift` and `UnsupportedChain`: the §4.5 config-sync checks.
 
 use thiserror::Error;
 use uuid::Uuid;
@@ -50,6 +54,12 @@ pub enum PortusError {
 
     #[error("Intent {0} not found")]
     IntentNotFound(Uuid),
+
+    #[error("Dispute window drift: plan embeds {plan_secs}s but Portus is configured for {config_secs}s")]
+    DisputeWindowDrift { plan_secs: u64, config_secs: u64 },
+
+    #[error("No dispute window is configured for chain {0}")]
+    UnsupportedChain(ChainId),
 
     #[error("HSM signing failure: {0}")]
     HsmError(String),

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //! Orchestrator trait (DESIGN.md §8.2) and an in-memory implementation.
 //!
-//! [`InMemoryEngine`] enforces plan validation and idempotency and drives the dispute-window
-//! state machine. It is not durable, and it does not verify proofs. A proof submission is
-//! always rejected until the verifier exists (§5.3), so no intent can succeed on unverified
-//! data.
+//! [`InMemoryEngine`] enforces plan validation, idempotency, and the §4.5 dispute-window
+//! config sync, and it drives the dispute-window state machine. It is not durable, and it
+//! does not verify proofs. A proof submission is always rejected until the verifier exists
+//! (§5.3), so no intent can succeed on unverified data.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
@@ -40,11 +40,20 @@ pub struct ProofAck {
     pub rejection_reason: Option<String>,
 }
 
+/// Portus-owned dispute window for one chain (§4.5). Mirrors `DisputeWindowConfig`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisputeWindow {
+    pub dispute_window_secs: u64,
+    /// Bumped on every operator change, so Statera can detect and log config changes.
+    pub config_version: u64,
+}
+
 #[async_trait]
 pub trait PortusEngine: Send + Sync {
     async fn execute_intent(&self, plan: IntentExecutionPlan)
         -> Result<AcceptanceAck, PortusError>;
     async fn get_status(&self, intent_id: Uuid) -> Result<ExecutionReceipt, PortusError>;
+    async fn get_dispute_window(&self, chain: &ChainId) -> Result<DisputeWindow, PortusError>;
     async fn submit_proof(&self, submission: ProofSubmission) -> Result<ProofAck, PortusError>;
     async fn shutdown(&self) -> Result<(), PortusError>;
 }
@@ -66,6 +75,7 @@ struct Record {
 #[derive(Default)]
 struct Inner {
     clock: Clock,
+    windows: HashMap<ChainId, DisputeWindow>,
     records: HashMap<Uuid, Record>,
 }
 
@@ -82,6 +92,22 @@ impl InMemoryEngine {
 
     pub fn set_clock(&self, clock: Clock) {
         self.lock().clock = clock;
+    }
+
+    /// Set the dispute window for a destination chain. Each call bumps the config version.
+    pub fn set_dispute_window(&self, chain: ChainId, dispute_window_secs: u64) {
+        let mut inner = self.lock();
+        let version = inner
+            .windows
+            .get(&chain)
+            .map_or(1, |w| w.config_version + 1);
+        inner.windows.insert(
+            chain,
+            DisputeWindow {
+                dispute_window_secs,
+                config_version: version,
+            },
+        );
     }
 
     /// Feed an event into an intent's state machine. This stands in for the dispatcher
@@ -158,6 +184,17 @@ impl PortusEngine for InMemoryEngine {
             return Err(PortusError::InvalidTimeout {
                 current,
                 timeout: plan.timeout_block_height,
+            });
+        }
+        // §4.5: the plan must embed exactly the window Portus enforces for its destination.
+        let window = *inner
+            .windows
+            .get(&plan.destination_chain)
+            .ok_or_else(|| PortusError::UnsupportedChain(plan.destination_chain.clone()))?;
+        if plan.dispute_window_secs != window.dispute_window_secs {
+            return Err(PortusError::DisputeWindowDrift {
+                plan_secs: plan.dispute_window_secs,
+                config_secs: window.dispute_window_secs,
             });
         }
         if let Some(existing) = inner.records.get(&plan.intent_id) {
@@ -241,6 +278,14 @@ impl PortusEngine for InMemoryEngine {
             // Receipt signing needs the HSM (§6.3), which is not available yet.
             portus_signature: vec![],
         })
+    }
+
+    async fn get_dispute_window(&self, chain: &ChainId) -> Result<DisputeWindow, PortusError> {
+        self.lock()
+            .windows
+            .get(chain)
+            .copied()
+            .ok_or_else(|| PortusError::UnsupportedChain(chain.clone()))
     }
 
     async fn submit_proof(&self, submission: ProofSubmission) -> Result<ProofAck, PortusError> {

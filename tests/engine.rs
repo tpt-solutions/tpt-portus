@@ -5,13 +5,17 @@ use tpt_portus::rollback::dispute_window::{IntentEvent, IntentState};
 use tpt_portus::types::{AssetDescriptor, ChainId, ExecutionStatus, IntentExecutionPlan};
 use uuid::Uuid;
 
-fn plan(id: Uuid, amount: u64, timeout: u64) -> IntentExecutionPlan {
+fn destination() -> ChainId {
+    ChainId::Cosmos {
+        chain_id: "osmosis-1".into(),
+    }
+}
+
+fn plan_with_window(id: Uuid, amount: u64, timeout: u64, window_secs: u64) -> IntentExecutionPlan {
     IntentExecutionPlan {
         intent_id: id,
         source_chain: ChainId::Evm { eip155_id: 1 },
-        destination_chain: ChainId::Cosmos {
-            chain_id: "osmosis-1".into(),
-        },
+        destination_chain: destination(),
         asset: AssetDescriptor {
             symbol: "USDC".into(),
             source_contract: vec![1],
@@ -22,7 +26,7 @@ fn plan(id: Uuid, amount: u64, timeout: u64) -> IntentExecutionPlan {
         amount,
         recipient_address: vec![3; 20],
         timeout_block_height: timeout,
-        dispute_window_secs: 600,
+        dispute_window_secs: window_secs,
         fee_budget: 1,
         cryptographic_proof: vec![],
         created_at: 0,
@@ -31,12 +35,18 @@ fn plan(id: Uuid, amount: u64, timeout: u64) -> IntentExecutionPlan {
     }
 }
 
+fn plan(id: Uuid, amount: u64, timeout: u64) -> IntentExecutionPlan {
+    plan_with_window(id, amount, timeout, 600)
+}
+
+/// Engine at block 10 with the osmosis window configured to 600 seconds.
 fn engine() -> InMemoryEngine {
     let e = InMemoryEngine::new();
     e.set_clock(Clock {
         block: 10,
         secs: 1000,
     });
+    e.set_dispute_window(destination(), 600);
     e
 }
 
@@ -97,6 +107,58 @@ async fn unknown_intent_is_not_found() {
         e.get_status(id).await.unwrap_err(),
         PortusError::IntentNotFound(id)
     );
+}
+
+#[tokio::test]
+async fn plan_embedding_a_different_window_is_rejected() {
+    let e = engine();
+    let id = Uuid::from_u128(9);
+    assert_eq!(
+        e.execute_intent(plan_with_window(id, 5, 100, 300))
+            .await
+            .unwrap_err(),
+        PortusError::DisputeWindowDrift {
+            plan_secs: 300,
+            config_secs: 600
+        }
+    );
+    // The rejected plan was not recorded, so the intent is unknown.
+    assert_eq!(
+        e.get_status(id).await.unwrap_err(),
+        PortusError::IntentNotFound(id)
+    );
+}
+
+#[tokio::test]
+async fn plan_to_unconfigured_chain_is_rejected() {
+    let e = engine();
+    let mut p = plan(Uuid::from_u128(10), 5, 100);
+    p.destination_chain = ChainId::Solana {
+        cluster: tpt_portus::types::SolanaCluster::Mainnet,
+    };
+    assert!(matches!(
+        e.execute_intent(p).await,
+        Err(PortusError::UnsupportedChain(_))
+    ));
+}
+
+#[tokio::test]
+async fn dispute_window_config_is_versioned() {
+    let e = engine();
+    let w = e.get_dispute_window(&destination()).await.unwrap();
+    assert_eq!(w.dispute_window_secs, 600);
+    assert_eq!(w.config_version, 1);
+
+    e.set_dispute_window(destination(), 300);
+    let w = e.get_dispute_window(&destination()).await.unwrap();
+    assert_eq!(w.dispute_window_secs, 300);
+    assert_eq!(w.config_version, 2);
+
+    // A plan built against the old window is now rejected as drift.
+    assert!(matches!(
+        e.execute_intent(plan(Uuid::from_u128(11), 5, 100)).await,
+        Err(PortusError::DisputeWindowDrift { .. })
+    ));
 }
 
 #[tokio::test]

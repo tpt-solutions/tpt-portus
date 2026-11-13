@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Alert rules for tpt-portus (DESIGN.md §12.2). Thresholds come from the design unless marked
+# TUNE. Metric names match src/metrics.rs.
+#
+# Not yet exported, so the last rule stays inert until the timing hooks exist:
+#   portus_relayer_claim_duration_seconds
+
+groups:
+  - name: portus-protocol
+    rules:
+      - alert: PortusRollbackRateHigh
+        # Design threshold: rollback rate above 5% over 10 minutes.
+        expr: |
+          sum(increase(portus_rollbacks_total[10m]))
+            /
+          clamp_min(sum(increase(portus_intents_total[10m])), 1)
+            > 0.05
+        labels:
+          severity: page
+        annotations:
+          summary: "Rollback rate above 5% over 10 minutes"
+          description: "Rollbacks are a large share of accepted intents. Check destination-chain outages and relayer liveness."
+
+      - alert: PortusDisputeWindowRace
+        # Design: any increment is alert-worthy. A late valid proof reached a closed window.
+        expr: increase(portus_dispute_window_races_detected_total[5m]) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: "Valid proof arrived after a dispute window closed"
+          description: "This is the late-execution race from DESIGN.md §5.5.1. Rejection held, but investigate the relayer that submitted it."
+
+      - alert: PortusProofVerificationFailureSpike
+        # TUNE: the design gives no number for "spike". 10 failures in 5 minutes is a placeholder.
+        expr: increase(portus_proof_verification_failures_total[5m]) > 10
+        labels:
+          severity: warn
+        annotations:
+          summary: "Spike in proof verification failures"
+          description: "Possible Byzantine relayer or a verifier regression. Note that the counter is not yet incremented by the engine."
+
+      - alert: PortusRelayerClaimStalled
+        # Design: no relayer claim completes within 60 seconds. Inert until the histogram is exported.
+        expr: |
+          histogram_quantile(
+            1,
+            sum by (le) (rate(portus_relayer_claim_duration_seconds_bucket[5m]))
+          ) > 60
+        labels:
+          severity: page
+        annotations:
+          summary: "Relayer claims taking longer than 60 seconds"
+          description: "Relayers may be offline or the backup pool escalation is not working."

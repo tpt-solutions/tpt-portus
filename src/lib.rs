@@ -3,6 +3,8 @@
 //!
 //! See `DESIGN.md` for the full specification.
 
+pub mod address;
+pub mod asset;
 pub mod config;
 pub mod error;
 pub mod grpc;

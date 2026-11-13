@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Skeleton Deployment for tpt-portus (DESIGN.md §12.1, §12.3).
+# Rolling upgrades use maxSurge: 1. protocol_version mismatches are rejected by
+# the daemon itself, not by this manifest.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portus
+  labels:
+    app.kubernetes.io/name: tpt-portus
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tpt-portus
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tpt-portus
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: portus
+          image: registry.internal/tpt/portus:TODO-version
+          ports:
+            - name: grpc
+              containerPort: 9400
+          env:
+            - name: PORTUS_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          readinessProbe:
+            grpc:
+              port: 9400
+            periodSeconds: 10
+          livenessProbe:
+            grpc:
+              port: 9400
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 512Mi

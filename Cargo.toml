@@ -1,0 +1,34 @@
+[package]
+name = "tpt-portus"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+description = "Cross-chain intent executor for the TPT ecosystem (tpt-portus)"
+repository = "https://github.com/TPT-Solutions/tpt-portus"
+readme = "README.md"
+publish = false
+
+[lib]
+name = "tpt_portus"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+toml = "0.8"
+async-trait = "0.1"
+prost = "0.13"
+tonic = "0.13"
+sha3 = "0.10"
+
+[build-dependencies]
+tonic-build = "0.13"
+
+[dev-dependencies]
+serde_json = "1"
+tokio = { version = "1.53.3", features = ["macros", "rt"] }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,61 @@
+# tpt-portus default configuration. DESIGN.md §7.1.
+#
+# Each chain's identity is the `ChainId` tagged enum (DESIGN.md §4.2), so the
+# numeric `chain_id` keys from the v0.2 config are intentionally not present.
+#
+# Any key can be overridden with a PORTUS_-prefixed environment variable (§7.2),
+# e.g. PORTUS_STATERA_ENDPOINT or PORTUS_CHAINS_BITCOIN_RPC_URL.
+
+[portus]
+node_id = "portus-node-01"
+listen_addr = "0.0.0.0:9400"
+log_level = "info"
+
+[portus.statera]
+endpoint = "grpc://statera.internal:9300"
+tls_cert = "/etc/tpt/certs/statera-ca.pem"
+timeout_ms = 5000
+
+[portus.relayer]
+message_bus = "nats://nats.internal:4222"
+min_acknowledgments = 3
+claim_timeout_secs = 30
+backup_pool_id = "relayer-backup-01"
+rate_limit_rps = 10
+fee_split_relayer_pct = 70
+fee_split_liquidity_pct = 20
+fee_split_slash_reserve_pct = 10
+
+[portus.chains.ethereum]
+rpc_url = "https://eth-mainnet.internal:8545"
+finality_blocks = 12
+endpoint_contract = "0x..."
+light_client_sync_interval_secs = 12
+dispute_window_secs = 600
+
+[portus.chains.solana]
+rpc_url = "https://solana-mainnet.internal:8899"
+finality_slots = 32
+endpoint_program = "PortusEndpoint1111111111111111111111"
+dispute_window_secs = 5
+
+[portus.chains.cosmos]
+rpc_url = "https://cosmos-mainnet.internal:26657"
+finality_blocks = 1
+ibc_client_id = "07-tendermint-42"
+dispute_window_secs = 5
+
+[portus.chains.bitcoin]
+rpc_url = "https://btc-mainnet.internal:8332"
+confirmation_depth = 6
+dispute_window_secs = 3600
+
+[portus.rollback]
+check_interval_secs = 5
+max_retry_attempts = 3
+slash_percentage = 10
+
+[portus.security]
+hsm_endpoint = "pkcs11:///dev/hsm0"
+key_id = "portus-signing-key-01"
+statera_signature_scheme = "threshold-ed25519"

@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+//
+// Wire contract between tpt-statera and tpt-portus. Transcribed from
+// DESIGN.md §8.1. Field numbers 20-29 are reserved on IntentExecutionPlan and
+// ExecutionReceipt for future additions (see §4.2.1 dust-threshold field).
+
+syntax = "proto3";
+
+package tpt.portus.v1;
+
+service PortusService {
+  rpc ExecuteIntent(IntentExecutionPlan) returns (AcceptanceAck);
+  rpc GetIntentStatus(IntentIdQuery) returns (ExecutionReceipt);
+  // Server-streaming variant recommended over polling for long-lived intents
+  // (an intent can sit in DISPUTE_WINDOW_OPEN for up to an hour on Bitcoin).
+  rpc WatchIntentStatus(IntentIdQuery) returns (stream ExecutionReceipt);
+  rpc SubmitProof(ProofSubmission) returns (ProofAck);
+  rpc GetDisputeWindow(ChainQuery) returns (DisputeWindowConfig);
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+// --- Chain identity: tagged, not a flat uint32 ---
+message ChainId {
+  oneof chain {
+    EvmChain evm = 1;
+    CosmosChain cosmos = 2;
+    SolanaChain solana = 3;
+    BitcoinChain bitcoin = 4;
+  }
+}
+message EvmChain     { uint64 eip155_id = 1; }
+message CosmosChain  { string chain_id = 1; }  // e.g. "osmosis-1"
+message SolanaChain  { SolanaCluster cluster = 1; }
+message BitcoinChain { BitcoinNetwork network = 1; }
+enum SolanaCluster   { SOLANA_MAINNET = 0; SOLANA_TESTNET = 1; SOLANA_DEVNET = 2; }
+enum BitcoinNetwork  { BITCOIN_MAINNET = 0; BITCOIN_TESTNET = 1; BITCOIN_SIGNET = 2; }
+
+message AssetDescriptor {
+  string symbol = 1;
+  bytes source_contract = 2;
+  bytes destination_contract = 3;
+  uint32 source_decimals = 4;
+  uint32 destination_decimals = 5;
+}
+
+message IntentExecutionPlan {
+  string intent_id = 1;
+  ChainId source_chain = 2;
+  ChainId destination_chain = 3;
+  AssetDescriptor asset = 4;
+  uint64 amount = 5;
+  bytes recipient_address = 6;
+  uint64 timeout_block_height = 7;
+  uint64 dispute_window_secs = 8;
+  uint64 fee_budget = 9;
+  bytes cryptographic_proof = 10;
+  uint64 created_at = 11;
+  uint32 protocol_version = 12;
+  bytes source_finality_proof = 13;
+
+  reserved 20 to 29;
+}
+
+message ExecutionReceipt {
+  string intent_id = 1;
+  ChainId destination_chain = 2;
+  ExecutionStatus status = 3;
+  bytes chain_proof = 4;
+  uint64 executed_at_block = 5;
+  bytes portus_signature = 6;
+
+  reserved 20 to 29;
+}
+
+enum ExecutionStatus {
+  PENDING = 0;
+  IN_FLIGHT = 1;
+  SUCCESS = 2;
+  FAILED = 3;
+  DISPUTE_WINDOW_OPEN = 4;
+  TIMEOUT = 5;
+  ROLLED_BACK = 6;
+}
+
+message AcceptanceAck {
+  string intent_id = 1;
+  bool accepted = 2;
+  string rejection_reason = 3;  // set only if accepted == false
+}
+
+message IntentIdQuery {
+  string intent_id = 1;
+}
+
+message ChainQuery {
+  ChainId chain_id = 1;
+}
+
+message DisputeWindowConfig {
+  ChainId chain_id = 1;
+  uint64 dispute_window_secs = 2;
+  uint64 config_version = 3;
+}
+
+message ProofSubmission {
+  string intent_id = 1;
+  bytes relayer_stake_ref = 2;  // checked before proof verification runs (§6.4)
+  bytes chain_proof = 3;
+  ChainId destination_chain = 4;
+}
+
+message ProofAck {
+  bool accepted = 1;
+  string rejection_reason = 2;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  map<string, string> component_status = 3;  // e.g. "nats" -> "ok", "hsm" -> "ok"
+}

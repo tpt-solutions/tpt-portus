@@ -10,37 +10,37 @@ traceable back to the source document.
 
 ## Phase 0 — Repository & Tooling Setup
 
-- [ ] Initialize Cargo workspace (`Cargo.toml`)
-- [ ] Add `LICENSE-MIT` and `LICENSE-APACHE` files (copyright TPT Solutions)
-- [ ] Set `license = "MIT OR Apache-2.0"` in `Cargo.toml` manifest
-- [ ] Decide and apply SPDX-License-Identifier header convention across source files
-- [ ] Scaffold directory structure per §15.C (`src/`, `proto/`, `tests/`, `deploy/`, `docs/`)
-- [ ] Set up `proto/portus/v1/portus.proto` build pipeline (prost/tonic codegen)
-- [ ] Set up CI: build, test, `clippy`, `fmt` checks
-- [ ] Write `README.md`
-- [ ] Promote `spec.txt` into `DESIGN.md` per §15.C, with an SPDX identifier stated (closing the spec's own license TODO)
-- [ ] Add `deploy/docker/Dockerfile` skeleton
-- [ ] Add `deploy/kubernetes/portus-deployment.yaml` + `portus-service.yaml` skeletons
-- [ ] Implement `portus.toml` defaults per §7.1 (`[portus]`, `[portus.statera]`, `[portus.relayer]`, `[portus.chains.*]`, `[portus.rollback]`, `[portus.security]`)
-- [ ] Implement `PORTUS_`-prefixed environment variable overrides per §7.2
-- [ ] Open a tracked dependency-risk register entry for `tpt-telos` compiler-backend soundness as a trust assumption, separate from Portus's own audit (§6.2, §14)
+- [x] Initialize Cargo workspace (`Cargo.toml`)
+- [x] Add `LICENSE-MIT` and `LICENSE-APACHE` files (copyright TPT Solutions)
+- [x] Set `license = "MIT OR Apache-2.0"` in `Cargo.toml` manifest
+- [x] Decide and apply SPDX-License-Identifier header convention across source files
+- [x] Scaffold directory structure per §15.C (`src/`, `proto/`, `tests/`, `deploy/`, `docs/`)
+- [x] Set up `proto/portus/v1/portus.proto` build pipeline (prost/tonic codegen)
+- [x] Set up CI: build, test, `clippy`, `fmt` checks
+- [x] Write `README.md`
+- [x] Promote `spec.txt` into `DESIGN.md` per §15.C, with an SPDX identifier stated (closing the spec's own license TODO)
+- [x] Add `deploy/docker/Dockerfile` skeleton
+- [x] Add `deploy/kubernetes/portus-deployment.yaml` + `portus-service.yaml` skeletons
+- [x] Implement `portus.toml` defaults per §7.1 (`[portus]`, `[portus.statera]`, `[portus.relayer]`, `[portus.chains.*]`, `[portus.rollback]`, `[portus.security]`)
+- [x] Implement `PORTUS_`-prefixed environment variable overrides per §7.2
+- [x] Open a tracked dependency-risk register entry for `tpt-telos` compiler-backend soundness as a trust assumption, separate from Portus's own audit (§6.2, §14)
 
 ---
 
 ## Phase 1 — Foundation (spec §13, Months 1–3)
 
-- [ ] Scaffold core module structure per §15.C: `types`, `error`, `engine`, `router/`, `dispatcher/`, `verifier/`, `endpoint_gen/`, `rollback/`, `grpc/`, `config`
-- [ ] Implement `ChainId` tagged enum: `Evm`, `Cosmos`, `Solana`, `Bitcoin` variants (§4.2)
-- [ ] Implement `AssetDescriptor` + cross-chain decimal conversion rule (§4.2.1)
-  - [ ] Flag the dust-threshold `ensures` contract as blocked pending `tpt-telos` fixed-point reasoning support (§4.2.1, §14)
+- [x] Scaffold core module structure per §15.C: `types`, `error`, `engine`, `router/`, `dispatcher/`, `verifier/`, `endpoint_gen/`, `rollback/`, `grpc/`, `config`
+- [x] Implement `ChainId` tagged enum: `Evm`, `Cosmos`, `Solana`, `Bitcoin` variants (§4.2)
+- [x] Implement `AssetDescriptor` + cross-chain decimal conversion rule (§4.2.1)
+  - [x] Flag the dust-threshold `ensures` contract as blocked pending `tpt-telos` fixed-point reasoning support (§4.2.1, §14)
 - [ ] Implement `IntentExecutionPlan` struct with `#[telos::verify]` contract annotations, incl. `source_finality_proof` field (§4.2)
-- [ ] Implement `ExecutionReceipt` + `ExecutionStatus` enum incl. `DisputeWindowOpen` variant (§4.3)
-- [ ] Implement `PortusError` taxonomy (§10.1)
-- [ ] Write full `.proto` service definition: `PortusService` RPCs + all messages — `ChainId`, `AssetDescriptor`, `IntentExecutionPlan`, `ExecutionReceipt`, `AcceptanceAck`, `IntentIdQuery`, `ChainQuery`, `DisputeWindowConfig`, `ProofSubmission`, `ProofAck`, `HealthRequest`/`HealthResponse` (§8.1)
-- [ ] Reserve field numbers 20–29 on `IntentExecutionPlan` and `ExecutionReceipt` for future additions (§8.1)
-- [ ] Generate gRPC codegen and implement the `PortusEngine` async trait (§8.2)
-- [ ] Implement address format validators for EVM, Solana, Cosmos
-- [ ] Implement Router module: single-hop routing + `(gas*0.4 + latency*0.4 + success_rate*0.2)` scoring (§5.1)
+- [x] Implement `ExecutionReceipt` + `ExecutionStatus` enum incl. `DisputeWindowOpen` variant (§4.3)
+- [x] Implement `PortusError` taxonomy (§10.1)
+- [x] Write full `.proto` service definition: `PortusService` RPCs + all messages — `ChainId`, `AssetDescriptor`, `IntentExecutionPlan`, `ExecutionReceipt`, `AcceptanceAck`, `IntentIdQuery`, `ChainQuery`, `DisputeWindowConfig`, `ProofSubmission`, `ProofAck`, `HealthRequest`/`HealthResponse` (§8.1)
+- [x] Reserve field numbers 20–29 on `IntentExecutionPlan` and `ExecutionReceipt` for future additions (§8.1)
+- [x] Generate gRPC codegen and implement the `PortusEngine` async trait (§8.2)
+- [x] Implement address format validators for EVM, Solana, Cosmos
+- [x] Implement Router module: single-hop routing + `(gas*0.4 + latency*0.4 + success_rate*0.2)` scoring (§5.1)
 - [ ] Implement `GetDisputeWindow` RPC; make Portus the sole source of truth for `dispute_window_secs`, with plan-vs-config drift rejected rather than silently overridden (§4.5)
 - [ ] Implement source-chain finality check: verify `source_finality_proof` independently in the `ExecuteIntent` handler rather than trusting Statera's say-so (§4.6)
 - [ ] Set up mTLS 1.3 transport between Statera and Portus daemons (§4.4, §6.3)
@@ -59,12 +59,12 @@ traceable back to the source document.
 - [ ] Integrate `tpt-eve` relayer agents: claim → execute → submit-proof flow
 - [ ] Implement Proof Verifier: EVM (Merkle Patricia Trie + light client header, optimistic tier) (§5.3)
 - [ ] Implement Proof Verifier: Cosmos (IBC Tendermint light client, fast-finality tier) (§5.3)
-- [ ] Implement the Rollback Engine dispute-window state machine per Appendix D (`Pending → InFlight → DisputeWindowOpen → Success/Failed/RolledBack`)
+- [x] Implement the Rollback Engine dispute-window state machine per Appendix D (adds `RollbackPending` between window close and the marker write; see `src/rollback/dispute_window.rs`) (`Pending → InFlight → DisputeWindowOpen → Success/Failed/RolledBack`)
 - [ ] Implement two-stage timeout: timeout fires into `DisputeWindowOpen` (no funds move), window elapses with no late `Success` before the on-chain `ROLLED_BACK` marker is written and `RollbackRequest` is emitted to Statera (§5.5.1)
-- [ ] Write the exhaustive `IntentState × IntentEvent` transition test asserting every pair either matches an explicit arm or returns `InvalidTransition` — never panics, never silently no-ops (§11.1, Appendix D test obligation)
+- [x] Write the exhaustive `IntentState × IntentEvent` transition test asserting every pair either matches an explicit arm or returns `InvalidTransition` — never panics, never silently no-ops (§11.1, Appendix D test obligation)
 - [ ] Implement `SubmitProof` protections: stake-reference check before verification, per-relayer rate limit (default 10 req/sec), queued/load-shed verification under overload (§6.4)
 - [ ] Generate the first `tpt-telos` endpoint contract: CosmWasm for Cosmos (§13 Phase 2)
-- [ ] Implement replay protection / idempotency: duplicate `intent_id` submissions return the existing receipt rather than re-executing (§4.4, §10.2)
+- [x] Implement replay protection / idempotency: duplicate `intent_id` submissions return the existing receipt rather than re-executing (§4.4, §10.2). Duplicates of an identical plan return an accepted `AcceptanceAck`, and the receipt is read via `GetIntentStatus`, matching the RPC signatures. Different plans under the same id are rejected as `ReplayAttack`.
 
 ---
 

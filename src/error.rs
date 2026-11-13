@@ -61,6 +61,9 @@ pub enum PortusError {
     #[error("No dispute window is configured for chain {0}")]
     UnsupportedChain(ChainId),
 
+    #[error("protocol version {got} is not supported; this build accepts {expected}")]
+    ProtocolVersionMismatch { expected: u16, got: u16 },
+
     #[error("HSM signing failure: {0}")]
     HsmError(String),
 }

@@ -6,6 +6,8 @@ traceable back to the source document.
 
 **License:** Dual-licensed under **MIT OR Apache-2.0**, © TPT Solutions.
 
+**Status (2026-11-13):** 41 of 73 items complete. 11 open items have partial work, marked `Partial:` on their lines. Most of the rest depend on external repositories (`tpt-telos`, `tpt-statera`, `tpt-eve`, `tpt-anima`), infrastructure, or hardware. Three items were added during implementation and are marked as such.
+
 ---
 
 ## Phase 0 — Repository & Tooling Setup
@@ -16,7 +18,7 @@ traceable back to the source document.
 - [x] Decide and apply SPDX-License-Identifier header convention across source files
 - [x] Scaffold directory structure per §15.C (`src/`, `proto/`, `tests/`, `deploy/`, `docs/`)
 - [x] Set up `proto/portus/v1/portus.proto` build pipeline (prost/tonic codegen)
-- [x] Set up CI: build, test, `clippy`, `fmt` checks
+- [x] Set up CI: build, test, `clippy`, `fmt` checks Workflow written in `.github/workflows/ci.yml`; not yet run on GitHub.
 - [x] Write `README.md`
 - [x] Promote `spec.txt` into `DESIGN.md` per §15.C, with an SPDX identifier stated (closing the spec's own license TODO)
 - [x] Add `deploy/docker/Dockerfile` skeleton
@@ -39,12 +41,13 @@ traceable back to the source document.
 - [x] Write full `.proto` service definition: `PortusService` RPCs + all messages — `ChainId`, `AssetDescriptor`, `IntentExecutionPlan`, `ExecutionReceipt`, `AcceptanceAck`, `IntentIdQuery`, `ChainQuery`, `DisputeWindowConfig`, `ProofSubmission`, `ProofAck`, `HealthRequest`/`HealthResponse` (§8.1)
 - [x] Reserve field numbers 20–29 on `IntentExecutionPlan` and `ExecutionReceipt` for future additions (§8.1)
 - [x] Generate gRPC codegen and implement the `PortusEngine` async trait (§8.2)
+- [x] Serve `PortusService` over gRPC with protobuf conversions and error-code mapping (§8.1). Implemented in `grpc/server.rs` and `grpc/convert.rs`, and exercised over a loopback socket in `tests/grpc_loopback.rs`. `WatchIntentStatus` returns `UNIMPLEMENTED` until the event bus exists.
 - [x] Implement address format validators for EVM, Solana, Cosmos
 - [x] Implement Router module: single-hop routing + `(gas*0.4 + latency*0.4 + success_rate*0.2)` scoring (§5.1)
 - [x] Implement `GetDisputeWindow` RPC; make Portus the sole source of truth for `dispute_window_secs`, with plan-vs-config drift rejected rather than silently overridden (§4.5)
 - [ ] Implement source-chain finality check: verify `source_finality_proof` independently in the `ExecuteIntent` handler rather than trusting Statera's say-so (§4.6)
 - [ ] Set up mTLS 1.3 transport between Statera and Portus daemons (§4.4, §6.3)
-- [ ] Build a mock `tpt-statera` harness for integration testing (§13 Phase 1)
+- [ ] Build a mock `tpt-statera` harness for integration testing (§13 Phase 1) Partial: the loopback gRPC test (`tests/grpc_loopback.rs`) drives the service with a generated client. It does not send signed plans, because signing is not implemented.
 - [ ] Decide the concrete threshold-signature scheme (threshold-Ed25519 vs. BLS) for Statera plan signing (§6.3, §14 open item)
 
 ---
@@ -53,17 +56,19 @@ traceable back to the source document.
 
 - [ ] Implement NATS-based Dispatcher module: publish plans to topic-based pub/sub (§5.2)
 - [x] Implement relayer independence/Sybil-resistance check: dedupe acknowledgments by distinct operator identity + distinct ASN before counting toward the 3-of-3 threshold (§5.2)
-- [ ] Implement backup relayer pool escalation on claim timeout (`timeout_block_height / 2`) (§5.2)
-- [x] Implement relayer fee-split economics: 70% relayer / 20% liquidity pool / 10% slash-reserve top-up, with pro-rata gas-cost refund instead of relayer pocketing the difference (§5.2.1) Pure split and gas-refund functions; the refund is the budgeted minus actual gas cost, not a pro-rata share of it.
-- [x] Implement stake-to-claimable-amount cap (`amount <= staked_bond * collateralization_ratio`, default 3x), falling through to backup pool when exceeded (§5.2.1)
+- [x] Implement backup relayer pool escalation on claim timeout (`timeout_block_height / 2`) (§5.2) Midpoint escalation (`dispatcher/escalation.rs`, read as the midpoint of the claim window) and the in-process `Coordinator` (`dispatcher/coordinator.rs`) handle publish, ack, claim, and failover to the backup pool. Network transport is not implemented.
+- [ ] Implement relayer fee-split economics: 70% relayer / 20% liquidity pool / 10% slash-reserve top-up, with pro-rata gas-cost refund instead of relayer pocketing the difference (§5.2.1) Partial: the split and gas-refund functions are in `dispatcher/fees.rs`. The refund is budgeted minus actual gas cost, not a pro-rata share, and neither the refund nor the fee-payer flow is wired to settlement.
+- [x] Implement stake-to-claimable-amount cap (`amount <= staked_bond * collateralization_ratio`, default 3x), falling through to backup pool when exceeded (§5.2.1) `may_claim` in `dispatcher/relayer_pool.rs` checks the cap. An over-cap claim falls through to the backup pool in the `Coordinator`.
 - [ ] Integrate `tpt-eve` relayer agents: claim → execute → submit-proof flow
-- [ ] Implement Proof Verifier: EVM (Merkle Patricia Trie + light client header, optimistic tier) (§5.3)
+- [ ] Implement Proof Verifier: EVM (Merkle Patricia Trie + light client header, optimistic tier) (§5.3) Partial: MPT inclusion and exclusion proofs are implemented in `verifier/evm.rs`. Light-client header verification is not implemented, so the header root is trusted by the caller.
 - [ ] Implement Proof Verifier: Cosmos (IBC Tendermint light client, fast-finality tier) (§5.3)
 - [x] Implement the Rollback Engine dispute-window state machine per Appendix D (adds `RollbackPending` between window close and the marker write; see `src/rollback/dispute_window.rs`) (`Pending → InFlight → DisputeWindowOpen → Success/Failed/RolledBack`)
-- [ ] Implement two-stage timeout: timeout fires into `DisputeWindowOpen` (no funds move), window elapses with no late `Success` before the on-chain `ROLLED_BACK` marker is written and `RollbackRequest` is emitted to Statera (§5.5.1)
+- [ ] Implement two-stage timeout: timeout fires into `DisputeWindowOpen` (no funds move), window elapses with no late `Success` before the on-chain `ROLLED_BACK` marker is written and `RollbackRequest` is emitted to Statera (§5.5.1) Partial: a `RollbackRequest` is queued after the marker is written (`drain_rollback_requests`). Delivery to Statera is not implemented, because the transport is not defined in this repository.
 - [x] Write the exhaustive `IntentState × IntentEvent` transition test asserting every pair either matches an explicit arm or returns `InvalidTransition` — never panics, never silently no-ops (§11.1, Appendix D test obligation)
-- [ ] Implement `SubmitProof` protections: stake-reference check before verification, per-relayer rate limit (default 10 req/sec), queued/load-shed verification under overload (§6.4)
+- [ ] Implement `SubmitProof` protections: stake-reference check before verification, per-relayer rate limit (default 10 req/sec), queued/load-shed verification under overload (§6.4) Partial: stake check and per-relayer rate limit are wired into `submit_proof`. A bounded load-shedding queue exists in `verifier/queue.rs` but is not yet used by the engine.
 - [ ] Generate the first `tpt-telos` endpoint contract: CosmWasm for Cosmos (§13 Phase 2)
+- [ ] Wire proof verifiers into the engine so `SubmitProof` can accept a verified proof (§5.3, §6.4). The verifiers exist as library functions. The engine currently rejects every proof.
+- [ ] Persist intent state durably. Added during implementation, not a spec task item. Required before any run with real intents; see `docs/operator-guide.md`.
 - [x] Implement replay protection / idempotency: duplicate `intent_id` submissions return the existing receipt rather than re-executing (§4.4, §10.2). Duplicates of an identical plan return an accepted `AcceptanceAck`, and the receipt is read via `GetIntentStatus`, matching the RPC signatures. Different plans under the same id are rejected as `ReplayAttack`.
 
 ---
@@ -73,16 +78,16 @@ traceable back to the source document.
 - [ ] Generate Solana endpoint program (Anchor/Rust) with account-model formal contract (§5.4)
 - [ ] Generate EVM endpoint contract (Solidity via `tpt-telos` FFI) with account-model formal contract (§5.4)
 - [ ] Generate Bitcoin endpoint (Script/Miniscript) with the UTXO-native invariant: `OP_RETURN` nonce replay protection, escrow-input full-spend guarantee (§5.4, corrected from v0.1)
-- [ ] Implement Proof Verifier: Solana (Ed25519 validator signature set, fast-finality tier) (§5.3)
-- [ ] Implement Proof Verifier: Bitcoin (SPV Merkle block proof + header-chain PoW, slow-finality tier) (§5.3)
-- [ ] Implement 2-hop routing (e.g., Ethereum → Cosmos → Solana) when no direct route exists (§5.1)
+- [x] Implement Proof Verifier: Solana (Ed25519 validator signature set, fast-finality tier) (§5.3) Signature-set verification with the 2/3 stake rule is in `verifier/solana.rs`. The signed message layout is left to the caller.
+- [x] Implement Proof Verifier: Bitcoin (SPV Merkle block proof + header-chain PoW, slow-finality tier) (§5.3) SPV inclusion, header-chain linkage, and per-header PoW are in `verifier/bitcoin.rs`. Difficulty retargeting is not checked, so the chain start must be trusted.
+- [ ] Implement 2-hop routing (e.g., Ethereum → Cosmos → Solana) when no direct route exists (§5.1) Partial: path selection is in `router/two_hop.rs`; engine integration (use only when no direct route) is not implemented.
 - [ ] Run formal verification via `tpt-telos` on all endpoint contracts before deployment — no unverified code on-chain (§11.3)
 - [ ] Run chaos testing: Ethereum reorg (3 blocks) during in-flight transfer, Byzantine relayer submitting fraudulent-but-valid-looking proofs, Statera↔Portus network partition (§11.4)
-- [ ] Run Sybil relayer attack simulation (multiple acknowledgments from one operator behind different addresses) confirming the diversity check rejects them (§5.2, §11.4)
+- [x] Run Sybil relayer attack simulation (multiple acknowledgments from one operator behind different addresses) confirming the diversity check rejects them (§5.2, §11.4)
 - [ ] Integrate HSM for key management: HD key derivation, private keys never leave HSM (§6.3)
-- [ ] Add dispute-window race integration test: inject a proof 1s before and 1s after `dispute_window_secs` closes, confirm outcome differs correctly (§11.2)
-- [ ] Add concurrent intent execution load test: 100 simultaneous cross-chain transfers (§11.2)
-- [ ] Add relayer failure simulation test: kill 2 of 3 relayers mid-execution (§11.2)
+- [x] Add dispute-window race integration test: inject a proof 1s before and 1s after `dispute_window_secs` closes, confirm outcome differs correctly (§11.2)
+- [x] Add concurrent intent execution load test: 100 simultaneous cross-chain transfers (§11.2)
+- [ ] Add relayer failure simulation test: kill 2 of 3 relayers mid-execution (§11.2) Partial: modelled in `tests/dispatch_sim.rs` and in the coordinator test `dead_relayers_fail_over_to_backup`, which covers relayers that never acknowledge. Killing relayers after they acknowledge is not modelled, because acknowledgments are not revoked.
 
 ---
 
@@ -90,16 +95,16 @@ traceable back to the source document.
 
 - [ ] Deploy to mainnet: Ethereum, Cosmos Hub, Solana, Osmosis, Arbitrum
 - [ ] Integrate with `tpt-payments` for chain-abstracted merchant/user flows
-- [ ] Instrument Prometheus metrics: `portus_intents_total`, `portus_execution_duration_seconds`, `portus_relayer_claim_duration_seconds`, `portus_proof_verification_failures_total`, `portus_rollbacks_total`, `portus_dispute_window_races_detected_total`, `portus_liquidity_available` (§12.2)
-- [ ] Instrument OpenTelemetry tracing spans for every intent, including the dispute-window wait (§12.2)
-- [ ] Configure alerting: rollback rate >5%/10min, no relayer claims >60s, proof verification failure spike, any dispute-window-race increment (§12.2)
-- [ ] Configure Kubernetes rolling upgrades (`maxSurge: 1`) with `protocol_version` mismatch rejected outright (§12.3)
+- [ ] Instrument Prometheus metrics: `portus_intents_total`, `portus_execution_duration_seconds`, `portus_relayer_claim_duration_seconds`, `portus_proof_verification_failures_total`, `portus_rollbacks_total`, `portus_dispute_window_races_detected_total`, `portus_liquidity_available` (§12.2) Partial: counters, the liquidity gauge, and `portus_execution_duration_seconds` are in `src/metrics.rs` and updated by the engine. `portus_relayer_claim_duration_seconds` needs relayer claims. `portus_proof_verification_failures_total` and `portus_liquidity_available` are never updated, because verification and liquidity are not wired in.
+- [ ] Instrument OpenTelemetry tracing spans for every intent, including the dispute-window wait (§12.2) Partial: `tracing` spans on `execute_intent` and `apply_event` carry `intent_id`. No OpenTelemetry exporter is configured, and the dispute-window wait is not yet a span.
+- [ ] Configure alerting: rollback rate >5%/10min, no relayer claims >60s, proof verification failure spike, any dispute-window-race increment (§12.2) Partial: rules are in `deploy/prometheus/portus-alerts.yml`, and the YAML is checked with PyYAML. `promtool` has not been run. The relayer-stall rule is inert until its histogram is exported. The spike threshold is a placeholder marked TUNE.
+- [x] Configure Kubernetes rolling upgrades (`maxSurge: 1`) with `protocol_version` mismatch rejected outright (§12.3) The manifest sets `maxSurge: 1`. The engine rejects any `protocol_version` other than 1 (`PROTOCOL_VERSION`). Not yet tested on a cluster.
 - [ ] Publish a public SDK for third-party dApps to consume `tpt-portus`
 - [ ] Commission an external security audit, explicitly prioritizing the §5.5.1 dispute-window/rollback mechanism and the §5.2 relayer independence check as the highest-priority review items (per the spec's own instruction)
 - [ ] Economically model and stress-test the §5.2.1 fee-split percentages against relayer profitability under realistic gas-price volatility before mainnet (§14)
-- [ ] Write a manual-reconciliation runbook for destination-chain outages that outlast the dispute window (§10.2, §14 residual risk)
-- [ ] Write an incident-response plan for third-party liquidity pool exploits affecting in-flight transfers, given Portus doesn't control the pools it routes through (§2.2, §14)
-- [ ] Publish documentation site + operator guide + developer onboarding guides
+- [x] Write a manual-reconciliation runbook for destination-chain outages that outlast the dispute window (§10.2, §14 residual risk) Done as a document: `docs/runbook-reconciliation.md`. Its procedures depend on tooling that does not exist yet, which the runbook lists.
+- [x] Write an incident-response plan for third-party liquidity pool exploits affecting in-flight transfers, given Portus doesn't control the pools it routes through (§2.2, §14) Done as a document: `docs/incident-response-liquidity-pool.md`. It lists the missing deny-list and route record that its steps depend on.
+- [ ] Publish documentation site + operator guide + developer onboarding guides Partial: `docs/operator-guide.md` and `docs/api.md` exist. No documentation site or developer onboarding guide yet.
 
 ---
 

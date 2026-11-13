@@ -6,8 +6,10 @@
 pub mod address;
 pub mod asset;
 pub mod config;
+pub mod engine;
 pub mod error;
 pub mod grpc;
+pub mod rollback;
 pub mod types;
 
 pub use error::PortusError;

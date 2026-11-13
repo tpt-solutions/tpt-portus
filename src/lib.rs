@@ -13,6 +13,7 @@ pub mod endpoint_gen;
 pub mod engine;
 pub mod error;
 pub mod grpc;
+pub mod metrics;
 pub mod rollback;
 pub mod router;
 pub mod types;

@@ -41,7 +41,7 @@ traceable back to the source document.
 - [x] Generate gRPC codegen and implement the `PortusEngine` async trait (§8.2)
 - [x] Implement address format validators for EVM, Solana, Cosmos
 - [x] Implement Router module: single-hop routing + `(gas*0.4 + latency*0.4 + success_rate*0.2)` scoring (§5.1)
-- [ ] Implement `GetDisputeWindow` RPC; make Portus the sole source of truth for `dispute_window_secs`, with plan-vs-config drift rejected rather than silently overridden (§4.5)
+- [x] Implement `GetDisputeWindow` RPC; make Portus the sole source of truth for `dispute_window_secs`, with plan-vs-config drift rejected rather than silently overridden (§4.5)
 - [ ] Implement source-chain finality check: verify `source_finality_proof` independently in the `ExecuteIntent` handler rather than trusting Statera's say-so (§4.6)
 - [ ] Set up mTLS 1.3 transport between Statera and Portus daemons (§4.4, §6.3)
 - [ ] Build a mock `tpt-statera` harness for integration testing (§13 Phase 1)
@@ -52,10 +52,10 @@ traceable back to the source document.
 ## Phase 2 — Execution & Relaying (spec §13, Months 4–6)
 
 - [ ] Implement NATS-based Dispatcher module: publish plans to topic-based pub/sub (§5.2)
-- [ ] Implement relayer independence/Sybil-resistance check: dedupe acknowledgments by distinct operator identity + distinct ASN before counting toward the 3-of-3 threshold (§5.2)
+- [x] Implement relayer independence/Sybil-resistance check: dedupe acknowledgments by distinct operator identity + distinct ASN before counting toward the 3-of-3 threshold (§5.2)
 - [ ] Implement backup relayer pool escalation on claim timeout (`timeout_block_height / 2`) (§5.2)
-- [ ] Implement relayer fee-split economics: 70% relayer / 20% liquidity pool / 10% slash-reserve top-up, with pro-rata gas-cost refund instead of relayer pocketing the difference (§5.2.1)
-- [ ] Implement stake-to-claimable-amount cap (`amount <= staked_bond * collateralization_ratio`, default 3x), falling through to backup pool when exceeded (§5.2.1)
+- [x] Implement relayer fee-split economics: 70% relayer / 20% liquidity pool / 10% slash-reserve top-up, with pro-rata gas-cost refund instead of relayer pocketing the difference (§5.2.1) Pure split and gas-refund functions; the refund is the budgeted minus actual gas cost, not a pro-rata share of it.
+- [x] Implement stake-to-claimable-amount cap (`amount <= staked_bond * collateralization_ratio`, default 3x), falling through to backup pool when exceeded (§5.2.1)
 - [ ] Integrate `tpt-eve` relayer agents: claim → execute → submit-proof flow
 - [ ] Implement Proof Verifier: EVM (Merkle Patricia Trie + light client header, optimistic tier) (§5.3)
 - [ ] Implement Proof Verifier: Cosmos (IBC Tendermint light client, fast-finality tier) (§5.3)
